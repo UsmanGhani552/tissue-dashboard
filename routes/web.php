@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ErrorFileController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MonthlyController;
 use App\Http\Controllers\PermissionController;
@@ -101,7 +102,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/manifest-delete-{manifest}',[ManifestController::class,'delete'])->name('manifest-delete');
 
     Route::get('/personalis_bsm',[PersonalisBsmController::class,'index'])->name('personalis_bsm');
-    Route::post('/import-personalis_bsm',[PersonalisBsmController::class,'import'])->name('personalis_bsm.import');
+    Route::get('/import-personalis_bsm',[PersonalisBsmController::class,'import'])->name('personalis_bsm.import');
     Route::get('/personalis_bsm/show',[PersonalisBsmController::class,'show'])->name('personalis_bsm.show');
     Route::get('/personalis_bsm/delete/{id}',[PersonalisBsmController::class,'delete'])->name('personalis_bsm.delete');
     // Route::get('/PersonalisBsmController-{PersonalisBsmControllerPersonalisBsmController::class,'show'])->name('PersonalisBsmController');
@@ -109,10 +110,20 @@ Route::middleware(['auth'])->group(function () {
     
     Route::get('/personalis_bsm_2',[PersonalisBsm2Controller::class,'index'])->name('personalis_bsm_2');
     Route::post('/import-personalis_bsm_2',[PersonalisBsm2Controller::class,'import'])->name('personalis_bsm_2.import');
+    Route::get('/queue/status', [PersonalisBsm2Controller::class, 'queueStatus'])->name('queue.status');
+    Route::get('/process-queue', [PersonalisBsm2Controller::class, 'processQueue'])->name('process.queue');
     Route::get('/personalis_bsm_2/show',[PersonalisBsm2Controller::class,'show'])->name('personalis_bsm_2.show');
     Route::get('/personalis_bsm_2/export',[PersonalisBsm2Controller::class,'export'])->name('personalis_bsm_2.export');
     Route::get('/personalis_bsm_2/delete/{id}',[PersonalisBsm2Controller::class,'delete'])->name('personalis_bsm_2.delete');
+    Route::get('/personalis_bsm_2',[PersonalisBsm2Controller::class,'index'])->name('personalis_bsm_2');
+    Route::get('/personalis_bsm_2/failed-jobs',[PersonalisBsm2Controller::class,'failedJobs'])->name('personalis_bsm_2.failedJobs');
+    Route::get('/personalis_bsm_2/retry-failed-jobs',[PersonalisBsm2Controller::class,'retryFailedJobs'])->name('personalis_bsm_2.retryFailedJobs');
+    
+
+    Route::get('/error-files',[ErrorFileController::class,'errorFiles'])->name('error-files');
+    Route::get('/retry',[ErrorFileController::class,'retry'])->name('retry');
 });
+Route::get('/personalis_bsm_2/delete-all', [PersonalisBsm2Controller::class, 'deleteAll'])->name('personalis_bsm_2.delete-all');
 
 
 

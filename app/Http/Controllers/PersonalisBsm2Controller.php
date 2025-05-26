@@ -3,38 +3,155 @@
 namespace App\Http\Controllers;
 
 use App\Exports\PersonalisBsm2Export;
+use App\Helpers\QueueManager;
 use App\Imports\SheetImport;
 use App\Jobs\ImportDriveDataJob;
+use App\Jobs\ProcessDriveFileJob;
+use App\Models\ErrorFile;
 use App\Models\Folder;
 use App\Models\PersonalisBsm2;
 use App\Models\PersonalisBsm2Sheet;
+use App\Models\TrackingErrorFile;
 use App\Services\DriveTokenService;
 use Carbon\Carbon;
+use Error;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 
 class PersonalisBsm2Controller extends Controller
 {
+    public function deleteAll()
+    {
+        try {
+            DB::beginTransaction();
+            PersonalisBsm2::truncate();
+            PersonalisBsm2Sheet::truncate();
+            DB::commit();
+            return redirect()->back()->withSuccess('Data Deleted successfully');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->withError($e->getMessage());
+        }
+    }
     public function index()
     {
         $personalis_bsm_2_sheets = PersonalisBsm2Sheet::all();
-        return view('personalis_bsm2.index',[
+        return view('personalis_bsm2.index', [
             'personalis_bsm_2_sheets' => $personalis_bsm_2_sheets,
         ]);
     }
 
     public function import(Request $request)
     {
-        $folder = Folder::select('id','name')->where('name','tracking')->with('driveFolders')->first();
-        $folderIds = $folder->driveFolders->pluck('drive_folder_id')->toArray();
-        foreach ($folderIds as $folderId) {
-            ImportDriveDataJob::dispatch($folderId)->onQueue('drive_import');
+        try {
+            if (Queue::size() > 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Queue is currently processing existing files.'
+                ]);
+            }
+            // Reset processed jobs counter
+            Cache::put('jobs_processed', 0);
+            Cache::put('total_jobs', 0);
+            Cache::put('imported_data', []);
+
+            DB::beginTransaction();
+            $folder = Folder::select('id', 'name')
+                ->where('name', 'tracking')
+                ->with('driveFolders')
+                ->first();
+
+            $time = now();
+            $jobCount = 0;
+
+            foreach ($folder->driveFolders as $drive_folder) {
+                ImportDriveDataJob::dispatch($drive_folder->drive_folder_id, $time);
+                $jobCount++;
+            }
+            DB::commit();
+            QueueManager::startQueueWorker($request->_token);
+
+            // Store total jobs count
+            Cache::put('total_jobs', $jobCount);
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$jobCount} import jobs have been queued.",
+                'queue_size' => $jobCount
+            ]);
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to queue import jobs: ' . $th->getMessage()
+            ], 500);
         }
-        return redirect()->back()->withSuccess('Drive import started. Check logs for progress.');
-       
     }
 
+    public function startQueue(Request $request)
+    {
+        try {
+            QueueManager::startQueueWorker($request->_token);
+            return response()->json(['queue_size' => QueueManager::queueSize(), 'message' => 'Queue count retrieved successfully']);
+        } catch (\Throwable $th) {
+            return response()->json('Couldn\'t recieve queue count due to: ' . $th->getMessage());
+        }
+    }
+
+    public function queueStatus()
+    {
+        return response()->json([
+            'size' => Queue::size(),
+            'processed' => Cache::get('jobs_processed', 0),
+            'total' => Cache::get('total_jobs', 0)
+        ]);
+    }
+
+    public function processQueue()
+    {
+        try {
+            // First retry any failed jobs
+            Artisan::call('queue:retry', ['id' => 'all']);
+
+            // Process multiple jobs at once
+            $exitCode = Artisan::call('queue:work', [
+                '--max-jobs' => 10, // Process up to 10 jobs per call
+                '--stop-when-empty' => true,
+                '--queue' => 'high,default',
+                '--tries' => 3,
+                '--timeout' => 120, // 2 minutes per job
+            ]);
+
+            return response()->json([
+                'success' => $exitCode === 0,
+                'processed' => Cache::increment('jobs_processed', 10) // Approximate count
+            ]);
+        } catch (\Throwable $th) {
+            Log::error('Queue processing failed: ' . $th->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Queue processing failed: ' . $th->getMessage()
+            ], 500);
+        }
+    }
+
+    public function failedJobs()
+    {
+        $failed = DB::table('failed_jobs')->get();
+        return response()->json(['failed_jobs' => $failed]);
+    }
+
+    public function retryFailedJobs()
+    {
+        Artisan::call('queue:retry', ['id' => 'all']);
+        return response()->json(['message' => 'All failed jobs have been retried']);
+    }
     public function export()
     {
         return Excel::download(new PersonalisBsm2Export(), 'productivity_data.xlsx');

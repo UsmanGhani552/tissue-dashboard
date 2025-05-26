@@ -1,10 +1,18 @@
 <?php
+
 namespace App\Services;
+
+use App\Jobs\ProcessDriveFileJob;
+use App\Models\Folder;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
+use PHPUnit\Framework\Constraint\Count;
+use Termwind\Components\Dd;
 
-class DriveTokenService {
+class DriveTokenService
+{
     private static function token()
     {
         $client_id = \Config('services.google.client_id');
@@ -22,7 +30,7 @@ class DriveTokenService {
 
     // public static function getDriveData($folderId){
     //     $query = "'$folderId' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'";
-    
+
     //     // Apply modified time filter if provided
     //     // if ($modifiedTime) {
     //     //     $query .= " and modifiedTime > '$modifiedTime'";
@@ -80,29 +88,42 @@ class DriveTokenService {
     //     }
     // }
 
-    public static function getDriveData($folderId){
-        $query = "'$folderId' in parents"; // Remove MIME type filter
-    
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . DriveTokenService::token(),
-        ])->get('https://www.googleapis.com/drive/v3/files', [
-            'q' => $query,
-            'fields' => 'files(id, name, mimeType, createdTime, modifiedTime)',
-        ]);
-        if ($response->successful()) {
-            $files = $response->json()['files'];
-            $parsedFiles = [];
-
-            foreach ($files as $file) {
-                $parsedFiles[] = self::processFile($file);
+    public static function getDriveData($folderId, $time)
+    {
+        try {
+            $folder = Folder::where('drive_folder_id', $folderId)->first();
+            $modifiedTime = $folder->updated_at;
+            $query = "'$folderId' in parents and (mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')" . ($modifiedTime ? " and modifiedTime > '$modifiedTime'" : '');
+            // $query = "'$folderId' in parents and modifiedTime > '2025-04-08T11:27:00'";
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . DriveTokenService::token(),
+            ])->get('https://www.googleapis.com/drive/v3/files', [
+                'q' => $query,
+                'fields' => 'files(id, name, mimeType, createdTime, modifiedTime)',
+            ]);
+            Log::info($response->json());
+            $folder->updated_at = $time;
+            $folder->save();
+            if ($response->successful()) {
+                $files = $response->json()['files'];
+                $parsedFiles = [];
+                foreach ($files as $file) {
+                    try {
+                        ProcessDriveFileJob::dispatch($file, $folder->id);
+                    } catch (\Throwable $th) {
+                        logger()->error("Import job failed: " . $th->getMessage());
+                    }
+                }
+                return $parsedFiles;
+            } else {
+                return response('Failed to retrieve files from the folder', $response->status());
             }
-            return $parsedFiles;
-        } else {
-            return response('Failed to retrieve files from the folder', $response->status());
+        } catch (\Throwable $th) {
+            Log::error($th->getMessage());
         }
-    } 
+    }
 
-    private static function processFile($file)
+    public static function processFile($file)
     {
         if ($file['mimeType'] === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
             return self::processExcelFile($file);
@@ -115,11 +136,49 @@ class DriveTokenService {
                 'mimeType' => $file['mimeType'],
                 'createdTime' => $file['createdTime'],
                 'modifiedTime' => $file['modifiedTime'],
-                'content' => 'Non-Excel and Non-Google Sheets file content not parsed',
+                'content' => [],
+                'message' => 'Unsupported file type'
             ];
         }
     }
 
+    public static function processExcelFileErrorFiles($fileID, $filename) 
+    {
+        $fileContentResponse = Http::withHeaders([
+            'Authorization' => 'Bearer ' . DriveTokenService::token(),
+        ])->get("https://www.googleapis.com/drive/v3/files/{$fileID}", [
+            'alt' => 'media',
+        ]);
+        if ($fileContentResponse->successful()) {
+            // Step 2: Save file temporarily
+            $tempFilePath = storage_path("app/temp/{$filename}");
+            Storage::put("temp/{$filename}", $fileContentResponse->body());
+
+            // Step 3: Parse the Excel file
+            $parsedData = Excel::toArray([], $tempFilePath);
+
+            // Step 4: Remove the temporary file
+            Storage::delete("temp/{$filename}");
+
+            return [
+                'id' => $fileID,
+                'name' => $filename,
+                // 'mimeType' => $fileContentResponse['mimeType'],
+                // 'createdTime' => $file['createdTime'],
+                // 'modifiedTime' => $file['modifiedTime'],
+                'content' => DriveTokenService::formatResponse($parsedData), // Parsed Excel content
+            ];
+        } else {
+            return [
+                'id' => $fileID,
+                // 'name' => $file['name'],
+                // 'mimeType' => $file['mimeType'],
+                // 'createdTime' => $file['createdTime'],
+                // 'modifiedTime' => $file['modifiedTime'],
+                'content' => 'Failed to fetch content',
+            ];
+        }
+    }
     private static function processExcelFile($file)
     {
         $fileContentResponse = Http::withHeaders([
@@ -145,7 +204,7 @@ class DriveTokenService {
                 'mimeType' => $file['mimeType'],
                 'createdTime' => $file['createdTime'],
                 'modifiedTime' => $file['modifiedTime'],
-                'content' => $parsedData, // Parsed Excel content
+                'content' => DriveTokenService::formatResponse($parsedData), // Parsed Excel content
             ];
         } else {
             return [
@@ -159,32 +218,117 @@ class DriveTokenService {
         }
     }
 
-    private static function processGoogleSheetFile($file)
+    public static function processGoogleErrorSheetFile($fileId,$filename)
     {
-        $sheetContentResponse = Http::withHeaders([
+        $sheetMetadataResponse = Http::withHeaders([
             'Authorization' => 'Bearer ' . DriveTokenService::token(),
-        ])->get("https://sheets.googleapis.com/v4/spreadsheets/{$file['id']}/values/Sheet1");
-        // dd($sheetContentResponse);
-        if ($sheetContentResponse->successful()) {
-            $parsedData = $sheetContentResponse->json()['values'];
+        ])->get("https://sheets.googleapis.com/v4/spreadsheets/{$fileId}", [
+            'fields' => 'properties,sheets,spreadsheetId,mimeType,modifiedTime' // Add the fields you need
+        ]);
+        if ($sheetMetadataResponse->successful()) {
+            $sheets = $sheetMetadataResponse->json()['sheets'];
+            $allSheetData = []; // To store data from all sheets
+            foreach ($sheets as $sheet) {
+                $sheetName = $sheet['properties']['title']; // Get the sheet name
 
+                $sheetContentResponse = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . DriveTokenService::token(),
+                ])->timeout(600)->get("https://sheets.googleapis.com/v4/spreadsheets/{$fileId}/values/{$sheetName}");
+                if ($sheetContentResponse->successful()) {
+                    $sheetJson = $sheetContentResponse->json();
+                    if (!isset($sheetJson['values'])) {
+                        $sheetJson['values'] = []; // Initialize if not set
+                    }
+                    $parsedData = $sheetJson['values'];
+                    $allSheetData[] = $parsedData; // Store data by sheet name
+                } else {
+                    $allSheetData[] = 'Failed to fetch content'; // Handle failure for specific sheet
+                }
+            }
             return [
-                'id' => $file['id'],
-                'name' => $file['name'],
-                'mimeType' => $file['mimeType'],
-                'createdTime' => $file['createdTime'],
-                'modifiedTime' => $file['modifiedTime'],
-                'content' => $parsedData, // Parsed Google Sheets content
-            ];
-        } else {
-            return [
-                'id' => $file['id'],
-                'name' => $file['name'],
-                'mimeType' => $file['mimeType'],
-                'createdTime' => $file['createdTime'],
-                'modifiedTime' => $file['modifiedTime'],
-                'content' => 'Failed to fetch content',
+                'id' => $fileId,
+                'name' => $filename,
+                // 'mimeType' => $file['mimeType'],
+                // 'createdTime' => $file['createdTime'],
+                // 'modifiedTime' => $file['modifiedTime'],
+                'content' => DriveTokenService::formatResponse($allSheetData), // Data from all sheets
             ];
         }
+        return [
+            'id' => $fileId,
+            'name' => $filename,
+            // 'mimeType' => $file['mimeType'],
+            // 'createdTime' => $file['createdTime'],
+            // 'modifiedTime' => $file['modifiedTime'],
+            'content' => 'Failed to fetch content',
+        ];
+    }
+    private static function processGoogleSheetFile($file)
+    {
+        $sheetMetadataResponse = Http::withHeaders([
+            'Authorization' => 'Bearer ' . DriveTokenService::token(),
+        ])->get("https://sheets.googleapis.com/v4/spreadsheets/{$file['id']}");
+
+        if ($sheetMetadataResponse->successful()) {
+            $sheets = $sheetMetadataResponse->json()['sheets'];
+            $allSheetData = []; // To store data from all sheets
+            foreach ($sheets as $sheet) {
+                $sheetName = $sheet['properties']['title']; // Get the sheet name
+
+                $sheetContentResponse = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . DriveTokenService::token(),
+                ])->timeout(600)->get("https://sheets.googleapis.com/v4/spreadsheets/{$file['id']}/values/{$sheetName}");
+                if ($sheetContentResponse->successful()) {
+                    $sheetJson = $sheetContentResponse->json();
+                    if (!isset($sheetJson['values'])) {
+                        $sheetJson['values'] = []; // Initialize if not set
+                    }
+                    $parsedData = $sheetJson['values'];
+                    $allSheetData[] = $parsedData; // Store data by sheet name
+                } else {
+                    $allSheetData[] = 'Failed to fetch content'; // Handle failure for specific sheet
+                }
+            }
+            return [
+                'id' => $file['id'],
+                'name' => $file['name'],
+                'mimeType' => $file['mimeType'],
+                'createdTime' => $file['createdTime'],
+                'modifiedTime' => $file['modifiedTime'],
+                'content' => DriveTokenService::formatResponse($allSheetData), // Data from all sheets
+            ];
+        }
+        return [
+            'id' => $file['id'],
+            'name' => $file['name'],
+            'mimeType' => $file['mimeType'],
+            'createdTime' => $file['createdTime'],
+            'modifiedTime' => $file['modifiedTime'],
+            'content' => 'Failed to fetch content',
+        ];
+    }
+    private static function formatResponse_v1($content)
+    {
+        if (
+            is_array($content) &&
+            count($content) > 0 &&
+            is_array($content[0]) &&
+            count($content[0]) > 0 &&
+            !is_array($content[0][0])
+        ) {
+            $content = [$content];
+        }
+        return $content;
+    }
+
+    private static function formatResponse($content)
+    {
+        try {
+            if (!is_array($content[0][0])) {
+                $content = [$content];
+            }
+        } catch (\Exception $e) {
+        }
+        return $content;
     }
 }

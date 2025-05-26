@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PersonalisBsm2Controller;
 use App\Services\DriveTokenService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -20,19 +21,8 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 
-Route::get('test-drive', function () {
-    $folderIds = [
-        \Config('services.google.tracking_1'),
-        \Config('services.google.tracking_2'),
-        \Config('services.google.tracking_3'),
-        \Config('services.google.tracking_4'),
-    ];
-    $drive_data = [];
+Route::get('process-delete-files', [PersonalisBsm2Controller::class, 'processDeleteFiles'])->name('process.delete.files');
 
-    foreach ($folderIds as $folderId) {
-        $data = DriveTokenService::getDriveData($folderId);
-        $drive_data = array_merge($drive_data, $data);
-    }
 
-    dd($drive_data);
-});
+Route::post('/import',[PersonalisBsm2Controller::class,'import'])->name('personalis_bsm_2.import');
+Route::get('/start-queue',[PersonalisBsm2Controller::class,'startQueue'])->name('personalis_bsm_2.start-queue');

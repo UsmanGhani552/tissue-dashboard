@@ -11,22 +11,27 @@ use Illuminate\Queue\SerializesModels;
 use App\Services\DriveTokenService;
 use App\Models\PersonalisBsm2;
 use App\Models\PersonalisBsm2Sheet;
+use App\Models\TrackingErrorFile;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ImportDriveDataJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     protected $folderId;
+    protected $time;
 
     /**
      * Create a new job instance.
      */
-    public function __construct($folderId)
+    public function __construct($folderId, $time)
     {
         $this->folderId = $folderId;
+        $this->time = $time;
     }
 
     /**
@@ -35,47 +40,139 @@ class ImportDriveDataJob implements ShouldQueue
     public function handle()
     {
         try {
-            DB::beginTransaction();
-            // Get last modified time from database
-            $lastModifiedFile = PersonalisBsm2Sheet::orderBy('created_at', 'desc')->first();
-            $lastModifiedTime = $lastModifiedFile ? $lastModifiedFile->created_at->toIso8601String() : null;
-            $drive_data = DriveTokenService::getDriveData($this->folderId,$lastModifiedTime); 
-            $file_ids = PersonalisBsm2Sheet::pluck('sheet_id')->toArray();
-            foreach ($drive_data as $records) {
-                $fileId = $records['id'];
-                $fileName = $records['name'];
-                if(in_array($fileId,$file_ids)){
+            Log::info("Importing Drive Data for folder ID: {$this->folderId} at time: {$this->time}");
+            DriveTokenService::getDriveData($this->folderId,$this->time);
+            Cache::increment('jobs_processed');
+        } catch (\Exception $e) {
+            // DB::rollBack();
+            Log::error("Drive Import Failed: " . $e->getMessage());
+        }
+    }
+    public function failed(\Throwable $exception)
+    {
+        // Handle failure
+        logger()->error("Import job failed: " . $exception->getMessage());
+    }
+
+    public function readFile($drive_data_file)
+    {
+        foreach ($drive_data_file as $records) {
+            // dd($records);
+            $fileName = $records['name'];
+
+            $dataToStore = [];
+            $isFailed = false;
+            foreach ($records['content'] as $sheetkey => $record) {
+                $data = $this->pageData($sheetkey, $record);
+                if (is_string($data)) {
+                    $isFailed = true;
+                    $dataToStore = [];
+                    $dataToStore[] = $data;
+                    break;
+                }
+                $dataToStore[] = $data;
+            }
+            if (!empty($dataToStore) && !empty($dataToStore[0]) && !$isFailed) { {
+                    DB::beginTransaction();
+                    $fileId = $records['id'];
+                    $bsm_sheet = PersonalisBsm2Sheet::create(['sheet_id' => $fileId, 'name' => $fileName]);
+                    $newRecords = array_map(function ($record) use ($bsm_sheet) {
+                        $record['bsm2_id'] = $bsm_sheet->id;
+                        return $record;
+                    }, $dataToStore[0]);
+                    PersonalisBsm2::insert($newRecords);
+                    DB::commit();
+                }
+            } else {
+                TrackingErrorFile::create([
+                    'file_name' => $fileName,
+                    'page_message' => json_encode($dataToStore),
+                ]);
+            }
+        }
+    }
+
+    public function pageData($sheetkey, $records)
+    {
+        try {
+            // finding header
+            $keys = [];
+            $rowIndex = -1;
+            foreach ($records as $keyRowIndex => $record) {
+                foreach ($record as $key => $recordValue) {
+                    Log::info('header value: ' . $recordValue);
+                    $value = Str::upper($recordValue);
+                    if (Str::contains($value, ['SUBMITTER ID', 'NTRA_SAMPLE_ID'])) {
+                        $keys[0] = $key;
+                    } elseif (Str::contains($value, ['RECIEVED', 'RECEIVED', 'Recieved'])) {
+                        $keys[1] = $key;
+                    } elseif (Str::contains($value, ['TRACKING'])) {
+                        $keys[2] = $key;
+                    } elseif (Str::contains($value, ['SHIP DATE'])) {
+                        $keys[3] = $key;
+                    }
+                }
+                if (count($keys) > 3) {
+                    $rowIndex = $keyRowIndex;
+                    break;
+                }
+            }
+            // dd($keys);
+            if (!isset($keys[0], $keys[1], $keys[2], $keys[3])) {
+                $keynotfound = '';
+                if (!isset($keys[0]))
+                    $keynotfound .= 'SUBMITTER ID, ';
+                if (!isset($keys[1]))
+                    $keynotfound .= 'RECIEVED, ';
+                if (!isset($keys[2]))
+                    $keynotfound .= 'TRACKING, ';
+                if (!isset($keys[3]))
+                    $keynotfound .= 'SHIP DATE, ';
+                // dd($keynotfound);
+                return 'Error Uploading Sheet (May be due to wrong sheet format). keynotfound: ' . $keynotfound;
+            }
+
+            // finding values
+            $dataToStore = [];
+
+            foreach ($records as $key => $record) {
+                // Skip the first row if it contains headers
+                if ($key <= $rowIndex) {
                     continue;
                 }
 
-                $newRecords = collect();
-                foreach ($records['content'][0] as $key => $record) {
-                    if ($key === 0 || (is_null($record[0]) && is_null($record[1]) && is_null($record[2]) && is_null($record[3]))) {
-                        continue;
-                    }
-
-                    $newRecords->push([
-                        'submitter_id' => $record[0],
-                        'tracking_id' => $record[10],
-                        'ship_date' => convertToDate2($record[11]) ?? '',
-                    ]);
+                if (empty($record) || is_null(value: $record[$keys[0]])) {
+                    continue; // Skip this record
                 }
 
-                if ($newRecords->isNotEmpty()) {
-                    $bsm_sheet = PersonalisBsm2Sheet::create(['sheet_id' => $fileId , 'name' => $fileName]);
-
-                    $newRecords = $newRecords->map(function ($record) use ($bsm_sheet) {
-                        $record['bsm2_id'] = $bsm_sheet->id;
-                        return $record;
-                    });
-
-                    PersonalisBsm2::insert($newRecords->toArray());
-                }
+                $dataToStore[] = [
+                    'submitter_id' => $record[$keys[0]],
+                    'tracking_id' => $record[$keys[2]] ?? '',
+                    'ship_date' => isset($record[$keys[3]]) && $record[$keys[3]] ? $this->convertToDate($record[$keys[3]])->toDateString() : null,
+                ];
             }
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Drive Import Failed: " . $e->getMessage());
+            return $dataToStore;
+        } catch (\Throwable $th) {
+            return 'Error Uploading Sheet (May be due to wrong sheet format): error: ' . $th->getMessage();
+        }
+    }
+
+    public function convertToDate($dateValue)
+    {
+        if (is_numeric($dateValue)) {
+            // Excel date system starts on January 1, 1900
+            $baseDate = Carbon::createFromDate(1900, 1, 1);
+
+            // Excel incorrectly treats 1900 as a leap year, so we subtract 1 day for dates after Feb 28, 1900
+            if ($dateValue > 59) {
+                $dateValue -= 1;
+            }
+
+            // Add the serial days to the base date
+            return $baseDate->addDays($dateValue - 1); // Subtract 1 because the base date is already day 1
+        } else {
+            // If it's already in date format, use it directly
+            return Carbon::parse($dateValue);
         }
     }
 }

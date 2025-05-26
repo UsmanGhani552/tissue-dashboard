@@ -1,81 +1,227 @@
 @extends('layout.master')
 @section('content')
-<div class="tab-content">
+    <div class="tab-content">
+        <div class="tab-pane active" id="currentweek" role="tabpanel" aria-labelledby="currentweek-tab">
+            <div class="container-fluid current-head">
+                <div class="row">
+                    <div class="col-lg-5">
+                        <h2>Total Records</h2>
+                    </div>
 
-
-    <div class="tab-pane active" id="currentweek" role="tabpanel" aria-labelledby="currentweek-tab">
-        <div class="container-fluid current-head">
-            <div class="row">
-                <div class="col-lg-5">
-                    <h2>Total Records</h2>
+                    <div class="col-lg-4">
+                        <a id="import-button" class="import-btn btn g-button forms">
+                            <span id="button-text">Import</span>
+                            <span id="button-spinner" class="spinner-border spinner-border-sm d-none"></span>
+                        </a>
+                    </div>
+                    <div class="col-lg-1">
+                        <a href="{{ route('personalis_bsm_2.show') }}" class="btn g-button">Show</a>
+                    </div>
+                    <div class="col-lg-1">
+                        <a href="{{ route('personalis_bsm_2.export') }}" class="btn g-button">Export</a>
+                    </div>
+                    <div class="col-lg-1">
+                        <a href="{{ route('personalis_bsm_2.delete-all') }}" class="btn btn-danger">Delete All</a>
+                    </div>
                 </div>
-
-                <div class="col-lg-5">
-                    <form class="d-flex forms" action="{{ route('personalis_bsm_2.import') }}" method="POST" enctype="multipart/form-data">
-                        @csrf
-                        <button type="submit" class="btn">Import</button>
-                    </form>
-                </div>
-                <div class="col-lg-1">
-                    <a href="{{ route('personalis_bsm_2.show') }}" class="btn g-button">Show</a>
-                </div>
-                <div class="col-lg-1">
-                    <a href="{{ route('personalis_bsm_2.export') }}" class="btn g-button">Export</a>
-                </div>
-
             </div>
-        </div>
-        @if (session()->has('success'))
-        <div class="alert alert-success">
-            {{ session()->get('success') }}
-        </div>
-        @endif
-        @if (session()->has('error'))
-        <div class="alert alert-danger">
-            {{ session()->get('error') }}
-        </div>
-        @endif
-        <div class="mainTable">
-            <div class="container-fluid">
-                <div class="bottomTable">
-                    <table class="table dataTable">
-                        <thead class="">
-                            <tr>
-                                <th>Id</th>
-                                <th>Name</th>
-                                {{-- <th>Created At</th> --}}
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="overflow-auto">
-                            @foreach ($personalis_bsm_2_sheets as $personalis_bsm_2_sheet)
-                            <tr>
-                                <td>{{ $personalis_bsm_2_sheet->id }}</td>
-                                <td>{{ $personalis_bsm_2_sheet->name }}</td>
-                                {{-- <td>{{ $personalis_bsm_2_sheet->created_at }}</td> --}}
 
-                                <td>
-                                    <div class="dropdown open">
-                                        {{-- <button class="btn btn-secondary dropdown-toggle" type="button" id="triggerId" data-bs-toggle="dropdown">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
-                                                <path d="M8 256a56 56 0 1 1 112 0A56 56 0 1 1 8 256zm160 0a56 56 0 1 1 112 0 56 56 0 1 1 -112 0zm216-56a56 56 0 1 1 0 112 56 56 0 1 1 0-112z" />
-                                            </svg>
-                                        </button> --}}
-                                        {{-- <div class="dropdown-menu" aria-labelledby="triggerId"> --}}
-                                            {{-- <a class="dropdown-item" href="{{ route('sheet1-show', $personalis_bsm_2_sheet->id) }}">Show</a> --}}
-                                            <a class="btn btn-danger" href="{{ route('personalis_bsm_2.delete', $personalis_bsm_2_sheet->id) }}">Delete</a>
-                                        {{-- </div> --}}
-                                    </div>
-                                    <!-- <button class="btn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M8 256a56 56 0 1 1 112 0A56 56 0 1 1 8 256zm160 0a56 56 0 1 1 112 0 56 56 0 1 1 -112 0zm216-56a56 56 0 1 1 0 112 56 56 0 1 1 0-112z"/></svg></button> -->
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+            <!-- Status Messages -->
+            <div id="status-message" class="mt-3">
+                @if (session()->has('success'))
+                    <div class="alert alert-success">
+                        {{ session()->get('success') }}
+                    </div>
+                @endif
+                @if (session()->has('error'))
+                    <div class="alert alert-danger">
+                        {{ session()->get('error') }}
+                    </div>
+                @endif
+            </div>
+
+            <!-- Progress Bar (hidden by default) -->
+            <div class="progress mt-3 d-none" id="progress-container">
+                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+                    style="width: 0%"></div>
+            </div>
+
+            <!-- Results Container (hidden by default) -->
+            <div class="mt-3" id="results-container" style="display: none;">
+                <div class="alert alert-info">
+                    <div id="processed-count" class="mb-2"></div>
+                    <div id="remaining-count" class="mb-2"></div>
+                </div>
+            </div>
+
+            <div class="mainTable">
+                <div class="container-fluid">
+                    <div class="bottomTable">
+                        <table class="table dataTable">
+                            <thead class="">
+                                <tr>
+                                    <th>Id</th>
+                                    <th>Name</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="overflow-auto">
+                                @foreach ($personalis_bsm_2_sheets as $personalis_bsm_2_sheet)
+                                    <tr>
+                                        <td>{{ $personalis_bsm_2_sheet->id }}</td>
+                                        <td>{{ $personalis_bsm_2_sheet->name }}</td>
+                                        <td>
+                                            <div class="dropdown open">
+                                                <a class="btn btn-danger"
+                                                    href="{{ route('personalis_bsm_2.delete', $personalis_bsm_2_sheet->id) }}">Delete</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-
-</div>
 @endsection
+
+@push('scripts')
+    <script>
+        $(document).ready(function () {
+            const button = $('#import-button');
+            const buttonText = $('#button-text');
+            const buttonSpinner = $('#button-spinner');
+            const statusDiv = $('#status-message');
+            const progressContainer = $('#progress-container');
+            const progressBar = $('#progress-bar');
+            const resultsContainer = $('#results-container');
+            const processedCount = $('#processed-count');
+            const remainingCount = $('#remaining-count');
+
+            let totalJobs = 0;
+            let checkInterval;
+
+            button.click(function (e) {
+                e.preventDefault();
+
+                // Reset UI
+                button.prop('disabled', true);
+                buttonText.text('Processing...');
+                buttonSpinner.removeClass('d-none');
+                statusDiv.html('<div class="alert alert-info">Preparing import...</div>');
+                progressContainer.addClass('d-none');
+                resultsContainer.hide();
+
+                // Start the import
+                $.ajax({
+                    url: '{{ route("personalis_bsm_2.import") }}',
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            // statusDiv.html('<div class="alert alert-success">' + response.message + '</div>');
+                            // totalJobs = response.queue_size;
+                            // startQueueProcessing();
+                        } else {
+                            showError(response.message);
+                        }
+                    },
+                    error: function (xhr) {
+                        showError(xhr.responseJSON?.message || 'An unknown error occurred');
+                    }
+                });
+                statusDiv.html('<div class="alert alert-success">' + response.message + '</div>');
+                totalJobs = 0;
+                startQueueProcessing();
+            });
+
+            function startQueueProcessing() {
+                progressContainer.removeClass('d-none');
+                progressBar.css('width', '0%');
+                resultsContainer.show();
+
+                // Call repeatedly every few seconds
+                checkInterval = setInterval(function () {
+                    // $.get('{{ route("process.queue") }}'); // this triggers 1 job per call
+
+                    $.get('{{ route("queue.status") }}', function (response) {
+                        const processed = response.processed || 0;
+                        const remaining = response.size || 0;
+                        const total = response.total || totalJobs;
+                        if(totalJobs === 0) {
+                            totalJobs = total;
+                        }
+
+                        const progressPercent = Math.round((processed / total) * 100);
+                        progressBar.css('width', progressPercent + '%');
+                        processedCount.html('<strong>Processed:</strong> ' + processed + ' jobs');
+                        remainingCount.html('<strong>Remaining:</strong> ' + remaining + ' jobs');
+
+                        if (remaining <= 0) {
+                            clearInterval(checkInterval);
+                            statusDiv.append('<div class="alert alert-success mt-2">All jobs completed successfully!</div>');
+                            button.prop('disabled', false);
+                            buttonText.text('Import');
+                            buttonSpinner.addClass('d-none');
+                            progressBar.removeClass('progress-bar-animated').removeClass('progress-bar-striped')
+                                .addClass('bg-success');
+                            setTimeout(function () {
+                                window.location.reload();
+                            }, 3000);
+                        }
+                    });
+                }, 3000); // every 3 seconds
+            }
+
+            function checkQueueStatus() {
+                clearInterval(checkInterval);
+
+                checkInterval = setInterval(function () {
+                    $.get('{{ route("queue.status") }}', function (response) {
+                        const processed = response.processed || 0;
+                        const remaining = response.size || 0;
+                        const total = response.total || totalJobs;
+
+                        // Update progress bar
+                        const progressPercent = Math.round((processed / total) * 100);
+                        progressBar.css('width', progressPercent + '%');
+
+                        // Update counters
+                        processedCount.html('<strong>Processed:</strong> ' + processed + ' jobs');
+                        remainingCount.html('<strong>Remaining:</strong> ' + remaining + ' jobs');
+
+                        // Check if completed
+                        if (remaining <= 0) {
+                            clearInterval(checkInterval);
+                            statusDiv.append('<div class="alert alert-success mt-2">All jobs completed successfully!</div>');
+                            button.prop('disabled', false);
+                            buttonText.text('Import');
+                            buttonSpinner.addClass('d-none');
+                            progressBar.removeClass('progress-bar-animated').removeClass('progress-bar-striped')
+                                .addClass('bg-success');
+                            // Reload the page after 3 seconds to show new data
+                            setTimeout(function () {
+                                window.location.reload();
+                            }, 3000);
+                        }
+                    }).fail(function () {
+                        clearInterval(checkInterval);
+                        showError('Error checking queue status');
+                    });
+                }, 2000); // Check every 2 seconds
+            }
+
+            function showError(message) {
+                clearInterval(checkInterval);
+                statusDiv.html('<div class="alert alert-danger">' + message + '</div>');
+                button.prop('disabled', false);
+                buttonText.text('Import');
+                buttonSpinner.addClass('d-none');
+            }
+        });
+    </script>
+@endpush

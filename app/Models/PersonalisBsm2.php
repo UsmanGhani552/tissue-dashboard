@@ -14,5 +14,7 @@ class PersonalisBsm2 extends Model
         'tracking_id',
         'ship_date',
         'bsm2_id',
+        'created_at',
+        'updated_at',
     ];
 }
