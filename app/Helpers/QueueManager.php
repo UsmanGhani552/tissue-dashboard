@@ -2,6 +2,7 @@
 
 namespace App\Helpers;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Log;
@@ -14,43 +15,63 @@ class QueueManager
         try {
             if (self::queueSize() == 0)
                 return;
+
+            function isWorkerRunning()
+            {
+                $process = new Process(['pgrep', '-f', 'queue:work']);
+                $process->run();
+                $output = trim($process->getOutput());
+                return !empty($output);
+            }
+            $processPID = null;
             try {
-                // Check if a queue worker process is already running
-                $existingProcess = new Process(['pgrep', '-f', 'queue:work']);
-                $existingProcess->run();
+                $processPID = Cache::get('queue_worker_pid');
+                Log::info("Queue worker PID :". $processPID);
 
-                if ($existingProcess->isSuccessful()) {
-                    // Stop the existing process
-                    $pid = trim($existingProcess->getOutput());
-                    Log::info("Stopping existing queue worker process with PID: $pid");
-                    $stopProcess = new Process(['kill', $pid]);
-                    $stopProcess->run();
+                if ($processPID != null) {
+                    // Check if process is still running
+                    if (function_exists('posix_kill')) {
+                        $pid = (int) $processPID;
 
-                    if (!$stopProcess->isSuccessful()) {
-                        Log::error('Failed to stop the existing queue worker process.');
-                        return;
+                        if (isWorkerRunning()) {
+                            Log::info("Process $pid is running.");
+                        } else {
+                            Log::warning("Process $pid is NOT running.");
+                            $processPID = null; // Reset if process is not running
+                        }
                     }
+                    else{
+                        Log::warning("posix_kill function does not exist. Cannot check process status.");
+                    }
+                } else {
+                    Log::warning("Queue worker PID file not found.");
                 }
-                //code...
             } catch (\Throwable $th) {
                 Log::error('Error checking existing queue worker process: ' . $th->getMessage());
             }
 
             // Start a new queue worker process
-            $command = [
-                'php',
-                base_path('artisan'),
-                'queue:work',
-                '--stop-when-empty',
-                '--tries=3'
-            ];
+            $process = null;
+            if($processPID == null){
+                $command = [
+                    'php',
+                    base_path('artisan'),
+                    'queue:listen',
+                    '--sleep=3',          // Sleep 3 seconds between jobs
+                    '--tries=3'           // Retry failed jobs 3 times
+                ];
 
-            $process = new Process($command);
-            $process->setTimeout(null); // No timeout for the overall process
-            $process->start();
+                $process = new Process($command);
+                $process->setTimeout(null); // No timeout for the overall process
+                $process->start();
+                $pid = $process->getPid();
+                Log::info("Queue worker started with PID: " . $pid);
+
+                Cache::put('queue_worker_pid', $pid);
+            }
 
             $startTime = time(); // Record the start time
-            while ($process->isRunning() && self::queueSize() > 0) {
+            while (self::queueSize() > 0) {
                 // Check if 1 minute has passed
                 if (time() - $startTime >= 60) {
                     // Hit the API
@@ -58,24 +79,14 @@ class QueueManager
                     if (self::queueSize() == 0)
                         break;
                     Log::info(self::queueSize());
-                    // break;
-                    $response = null;
                     try {
-                        $response = Http::withHeaders([
-                            'Content-Type' => 'application/json',
-                            // 'Authorization' => "Bearer $authToken"
-                        ])->get(env("APP_URL").'/api/start-queue');
-                        Log::info('API response: ' . $response->body());
+                        $apiUrl = env("APP_URL") . '/api/start-queue';
+                        $cmd = "curl -X GET -H 'Content-Type: application/json' '$apiUrl' > /dev/null 2>&1 &";
+                        exec($cmd);
+                        Log::info('API called asynchronously: ' . $apiUrl);
+                        return;
                     } catch (\Throwable $th) {
                         log::error('Error hitting API: ' . $th->getMessage());
-                    }
-
-                    // Log the API response
-                    if ($response->successful()) {
-                        Log::info('API hit successfully: ' . $response->body());
-                        return;
-                    } else {
-                        Log::error('Failed to hit API: ' . $response->body());
                     }
 
                     // Reset the start time
@@ -87,7 +98,7 @@ class QueueManager
                 sleep(5); // Prevent tight looping
             }
 
-            Log::info("Queue is running " . $process->isRunning() . " , queue size is: " . self::queueSize());
+            Log::info("Queue is running " . isWorkerRunning() . " , queue size is: " . self::queueSize());
 
             Log::info('Queue worker finished processing all jobs.');
         } catch (\Exception $e) {

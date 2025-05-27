@@ -169,6 +169,7 @@ class DriveTokenService
                 'content' => DriveTokenService::formatResponse($parsedData), // Parsed Excel content
             ];
         } else {
+            log::error("Failed to fetch content for sheet: {$fileContentResponse->body()}");
             return [
                 'id' => $fileID,
                 // 'name' => $file['name'],
@@ -207,6 +208,7 @@ class DriveTokenService
                 'content' => DriveTokenService::formatResponse($parsedData), // Parsed Excel content
             ];
         } else {
+            log::error("Failed to fetch content for sheet: {$fileContentResponse->body()}");
             return [
                 'id' => $file['id'],
                 'name' => $file['name'],
@@ -242,6 +244,7 @@ class DriveTokenService
                     $parsedData = $sheetJson['values'];
                     $allSheetData[] = $parsedData; // Store data by sheet name
                 } else {
+                    log::error("Failed to fetch content for sheet: {$sheetContentResponse->body()}");
                     $allSheetData[] = 'Failed to fetch content'; // Handle failure for specific sheet
                 }
             }
@@ -254,6 +257,7 @@ class DriveTokenService
                 'content' => DriveTokenService::formatResponse($allSheetData), // Data from all sheets
             ];
         }
+        log::error("Failed to fetch metadata for sheet: {$sheetMetadataResponse->body()}");
         return [
             'id' => $fileId,
             'name' => $filename,
@@ -289,6 +293,7 @@ class DriveTokenService
                     $allSheetData[] = 'Failed to fetch content'; // Handle failure for specific sheet
                 }
             }
+
             return [
                 'id' => $file['id'],
                 'name' => $file['name'],
@@ -298,6 +303,7 @@ class DriveTokenService
                 'content' => DriveTokenService::formatResponse($allSheetData), // Data from all sheets
             ];
         }
+        log::error("Failed to fetch metadata for sheet: {$sheetMetadataResponse->body()}");
         return [
             'id' => $file['id'],
             'name' => $file['name'],

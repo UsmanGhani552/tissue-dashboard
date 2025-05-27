@@ -1,4 +1,3 @@
-
 <?php $__env->startSection('content'); ?>
     <div class="tab-content">
         <div class="tab-pane active" id="currentweek" role="tabpanel" aria-labelledby="currentweek-tab">
@@ -227,4 +226,4 @@
         });
     </script>
 <?php $__env->stopPush(); ?>
-<?php echo $__env->make('layout.master', \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?><?php /**PATH D:\Downloads\laragon\www\compare\resources\views/personalis_bsm2/index.blade.php ENDPATH**/ ?>
+<?php echo $__env->make('layout.master', \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?><?php /**PATH /home/u749698746/domains/koderspedia.net/public_html/tissue-dashboard/resources/views/personalis_bsm2/index.blade.php ENDPATH**/ ?>

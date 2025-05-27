@@ -51,6 +51,7 @@ class PersonalisBsm2Controller extends Controller
     {
         try {
             if (Queue::size() > 0) {
+                $this->startQueue($request);
                 return response()->json([
                     'success' => false,
                     'message' => 'Queue is currently processing existing files.'

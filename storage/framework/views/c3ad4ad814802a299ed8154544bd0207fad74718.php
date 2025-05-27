@@ -106,4 +106,4 @@
 </body>
 
 </html>
-<?php /**PATH D:\Downloads\laragon\www\compare\resources\views/layout/master.blade.php ENDPATH**/ ?>
+<?php /**PATH /home/u749698746/domains/koderspedia.net/public_html/tissue-dashboard/resources/views/layout/master.blade.php ENDPATH**/ ?>

@@ -51,15 +51,21 @@ class ProcessDriveFileJob implements ShouldQueue
             $dataToStore = [];
             $isFailed = false;
             Log::info("Processing file: {$fileName} with ID: {$fileId} and MIME type: {$mimeType}");
-            foreach ($fileData['content'] as $sheetkey => $record) {
-                $data = $this->pageData($sheetkey, $record);
-                if (is_string($data)) {
-                    $isFailed = true;
-                    $dataToStore = [];
+            if(is_string($fileData['content'])){
+                 $isFailed = true;
+                $dataToStore = [];
+                $dataToStore[] = $fileData['content'];
+            }else{
+                foreach ($fileData['content'] as $sheetkey => $record) {
+                    $data = $this->pageData($sheetkey, $record);
+                    if (is_string($data)) {
+                        $isFailed = true;
+                        $dataToStore = [];
+                        $dataToStore[] = $data;
+                        break;
+                    }
                     $dataToStore[] = $data;
-                    break;
                 }
-                $dataToStore[] = $data;
             }
 
             if (!empty($dataToStore) && !$isFailed) {
