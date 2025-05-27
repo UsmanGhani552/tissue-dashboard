@@ -142,7 +142,7 @@ class DriveTokenService
         }
     }
 
-    public static function processExcelFileErrorFiles($fileID, $filename) 
+    public static function processExcelFileErrorFiles($fileID, $filename)
     {
         $fileContentResponse = Http::withHeaders([
             'Authorization' => 'Bearer ' . DriveTokenService::token(),
@@ -182,32 +182,45 @@ class DriveTokenService
     }
     private static function processExcelFile($file)
     {
-        $fileContentResponse = Http::withHeaders([
-            'Authorization' => 'Bearer ' . DriveTokenService::token(),
-        ])->get("https://www.googleapis.com/drive/v3/files/{$file['id']}", [
-            'alt' => 'media',
-        ]);
+        try {
+            //code...
+            $fileContentResponse = Http::withHeaders([
+                'Authorization' => 'Bearer ' . DriveTokenService::token(),
+            ])->get("https://www.googleapis.com/drive/v3/files/{$file['id']}", [
+                'alt' => 'media',
+            ]);
 
-        if ($fileContentResponse->successful()) {
-            // Step 2: Save file temporarily
-            $tempFilePath = storage_path("app/temp/{$file['name']}");
-            Storage::put("temp/{$file['name']}", $fileContentResponse->body());
+            if ($fileContentResponse->successful()) {
+                // Step 2: Save file temporarily
+                $tempFilePath = storage_path("app/temp/{$file['name']}");
+                Storage::put("temp/{$file['name']}", $fileContentResponse->body());
 
-            // Step 3: Parse the Excel file
-            $parsedData = Excel::toArray([], $tempFilePath);
+                // Step 3: Parse the Excel file
+                $parsedData = Excel::toArray([], $tempFilePath);
 
-            // Step 4: Remove the temporary file
-            Storage::delete("temp/{$file['name']}");
+                // Step 4: Remove the temporary file
+                Storage::delete("temp/{$file['name']}");
 
-            return [
-                'id' => $file['id'],
-                'name' => $file['name'],
-                'mimeType' => $file['mimeType'],
-                'createdTime' => $file['createdTime'],
-                'modifiedTime' => $file['modifiedTime'],
-                'content' => DriveTokenService::formatResponse($parsedData), // Parsed Excel content
-            ];
-        } else {
+                return [
+                    'id' => $file['id'],
+                    'name' => $file['name'],
+                    'mimeType' => $file['mimeType'],
+                    'createdTime' => $file['createdTime'],
+                    'modifiedTime' => $file['modifiedTime'],
+                    'content' => DriveTokenService::formatResponse($parsedData), // Parsed Excel content
+                ];
+            } else {
+                log::error("Failed to fetch content for sheet: {$fileContentResponse->body()}");
+                return [
+                    'id' => $file['id'],
+                    'name' => $file['name'],
+                    'mimeType' => $file['mimeType'],
+                    'createdTime' => $file['createdTime'],
+                    'modifiedTime' => $file['modifiedTime'],
+                    'content' => 'Failed to fetch content',
+                ];
+            }
+        } catch (\Throwable $th) {
             log::error("Failed to fetch content for sheet: {$fileContentResponse->body()}");
             return [
                 'id' => $file['id'],
@@ -215,12 +228,12 @@ class DriveTokenService
                 'mimeType' => $file['mimeType'],
                 'createdTime' => $file['createdTime'],
                 'modifiedTime' => $file['modifiedTime'],
-                'content' => 'Failed to fetch content',
+                'content' => $th->getMessage(),
             ];
         }
     }
 
-    public static function processGoogleErrorSheetFile($fileId,$filename)
+    public static function processGoogleErrorSheetFile($fileId, $filename)
     {
         $sheetMetadataResponse = Http::withHeaders([
             'Authorization' => 'Bearer ' . DriveTokenService::token(),
@@ -269,49 +282,62 @@ class DriveTokenService
     }
     private static function processGoogleSheetFile($file)
     {
-        $sheetMetadataResponse = Http::withHeaders([
-            'Authorization' => 'Bearer ' . DriveTokenService::token(),
-        ])->get("https://sheets.googleapis.com/v4/spreadsheets/{$file['id']}");
-
-        if ($sheetMetadataResponse->successful()) {
-            $sheets = $sheetMetadataResponse->json()['sheets'];
-            $allSheetData = []; // To store data from all sheets
-            foreach ($sheets as $sheet) {
-                $sheetName = $sheet['properties']['title']; // Get the sheet name
-
-                $sheetContentResponse = Http::withHeaders([
-                    'Authorization' => 'Bearer ' . DriveTokenService::token(),
-                ])->timeout(600)->get("https://sheets.googleapis.com/v4/spreadsheets/{$file['id']}/values/{$sheetName}");
-                if ($sheetContentResponse->successful()) {
-                    $sheetJson = $sheetContentResponse->json();
-                    if (!isset($sheetJson['values'])) {
-                        $sheetJson['values'] = []; // Initialize if not set
+        try {
+            //code...
+            $sheetMetadataResponse = Http::withHeaders([
+                'Authorization' => 'Bearer ' . DriveTokenService::token(),
+            ])->get("https://sheets.googleapis.com/v4/spreadsheets/{$file['id']}");
+    
+            if ($sheetMetadataResponse->successful()) {
+                $sheets = $sheetMetadataResponse->json()['sheets'];
+                $allSheetData = []; // To store data from all sheets
+                foreach ($sheets as $sheet) {
+                    $sheetName = $sheet['properties']['title']; // Get the sheet name
+    
+                    $sheetContentResponse = Http::withHeaders([
+                        'Authorization' => 'Bearer ' . DriveTokenService::token(),
+                    ])->timeout(600)->get("https://sheets.googleapis.com/v4/spreadsheets/{$file['id']}/values/{$sheetName}");
+                    if ($sheetContentResponse->successful()) {
+                        $sheetJson = $sheetContentResponse->json();
+                        if (!isset($sheetJson['values'])) {
+                            $sheetJson['values'] = []; // Initialize if not set
+                        }
+                        $parsedData = $sheetJson['values'];
+                        $allSheetData[] = $parsedData; // Store data by sheet name
+                    } else {
+                        $allSheetData[] = 'Failed to fetch content'; // Handle failure for specific sheet
                     }
-                    $parsedData = $sheetJson['values'];
-                    $allSheetData[] = $parsedData; // Store data by sheet name
-                } else {
-                    $allSheetData[] = 'Failed to fetch content'; // Handle failure for specific sheet
                 }
+    
+                return [
+                    'id' => $file['id'],
+                    'name' => $file['name'],
+                    'mimeType' => $file['mimeType'],
+                    'createdTime' => $file['createdTime'],
+                    'modifiedTime' => $file['modifiedTime'],
+                    'content' => DriveTokenService::formatResponse($allSheetData), // Data from all sheets
+                ];
             }
-
+            log::error("Failed to fetch metadata for sheet: {$sheetMetadataResponse->body()}");
             return [
                 'id' => $file['id'],
                 'name' => $file['name'],
                 'mimeType' => $file['mimeType'],
                 'createdTime' => $file['createdTime'],
                 'modifiedTime' => $file['modifiedTime'],
-                'content' => DriveTokenService::formatResponse($allSheetData), // Data from all sheets
+                'content' => 'Failed to fetch content',
+            ];
+        } catch (\Throwable $th) {
+            log::error("Failed to fetch metadata for sheet: {$sheetMetadataResponse->body()}");
+            return [
+                'id' => $file['id'],
+                'name' => $file['name'],
+                'mimeType' => $file['mimeType'],
+                'createdTime' => $file['createdTime'],
+                'modifiedTime' => $file['modifiedTime'],
+                'content' => $th->getMessage(),
             ];
         }
-        log::error("Failed to fetch metadata for sheet: {$sheetMetadataResponse->body()}");
-        return [
-            'id' => $file['id'],
-            'name' => $file['name'],
-            'mimeType' => $file['mimeType'],
-            'createdTime' => $file['createdTime'],
-            'modifiedTime' => $file['modifiedTime'],
-            'content' => 'Failed to fetch content',
-        ];
     }
     private static function formatResponse_v1($content)
     {
