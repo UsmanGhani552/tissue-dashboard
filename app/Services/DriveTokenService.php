@@ -110,8 +110,8 @@ class DriveTokenService
                 foreach ($files as $file) {
                     try {
                         $arr = [
-                            'TIH_63-98_1.17.25',
-                            'PL_ARCHIVE_4.29.25'
+                            'PL_ARCHIVE_4.25.25',
+                            'TIH_33-60-61_1.10.25'
                         ];
                         if (!in_array($file['name'], $arr)) {
                            continue;
