@@ -109,6 +109,13 @@ class DriveTokenService
                 $parsedFiles = [];
                 foreach ($files as $file) {
                     try {
+                        $arr = [
+                            'TIH_63-98_1.17.25',
+                            'PL_ARCHIVE_4.29.25'
+                        ];
+                        if (!in_array($file['name'], $arr)) {
+                           continue;
+                        }
                         ProcessDriveFileJob::dispatch($file, $folder->id);
                     } catch (\Throwable $th) {
                         logger()->error("Import job failed: " . $th->getMessage());
