@@ -10,7 +10,7 @@ use Symfony\Component\Process\Process;
 
 class QueueManager
 {
-    public static function startQueueWorker($authToken)
+    public static function startQueueWorker($authToken = null)
     {
         try {
             if (self::queueSize() == 0)
