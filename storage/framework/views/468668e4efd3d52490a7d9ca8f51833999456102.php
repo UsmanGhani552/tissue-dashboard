@@ -1,5 +1,5 @@
-@extends('layout.master')
-@section('content')
+
+<?php $__env->startSection('content'); ?>
     <div class="tab-content">
         <div class="tab-pane active" id="currentweek" role="tabpanel" aria-labelledby="currentweek-tab">
             <div class="container-fluid current-head">
@@ -13,25 +13,27 @@
                             <span id="button-text">Import</span>
                             <span id="button-spinner" class="spinner-border spinner-border-sm d-none"></span>
                         </a>
-                        <a href="{{ route('personalis_bsm_2.show') }}" class="btn g-button">Show</a>
-                        <a href="{{ route('personalis_bsm_2.export') }}" class="btn g-button">Export</a>
-                        <a href="{{ route('personalis_bsm_2.delete-all') }}" class="btn r-button">Delete All</a>
+                        <a href="<?php echo e(route('personalis_bsm_2.show')); ?>" class="btn g-button">Show</a>
+                        <a href="<?php echo e(route('personalis_bsm_2.export')); ?>" class="btn g-button">Export</a>
+                        <a href="<?php echo e(route('personalis_bsm_2.delete-all')); ?>" class="btn r-button">Delete All</a>
                     </div>
                 </div>
             </div>
 
             <!-- Status Messages -->
             <div id="status-message" class="mt-3">
-                @if (session()->has('success'))
+                <?php if(session()->has('success')): ?>
                     <div class="alert alert-success">
-                        {{ session()->get('success') }}
+                        <?php echo e(session()->get('success')); ?>
+
                     </div>
-                @endif
-                @if (session()->has('error'))
+                <?php endif; ?>
+                <?php if(session()->has('error')): ?>
                     <div class="alert alert-danger">
-                        {{ session()->get('error') }}
+                        <?php echo e(session()->get('error')); ?>
+
                     </div>
-                @endif
+                <?php endif; ?>
             </div>
 
             <!-- Progress Bar (hidden by default) -->
@@ -60,18 +62,18 @@
                                 </tr>
                             </thead>
                             <tbody class="overflow-auto">
-                                @foreach ($personalis_bsm_2_sheets as $personalis_bsm_2_sheet)
+                                <?php $__currentLoopData = $personalis_bsm_2_sheets; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $personalis_bsm_2_sheet): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                     <tr>
-                                        <td>{{ $personalis_bsm_2_sheet->id }}</td>
-                                        <td>{{ $personalis_bsm_2_sheet->name }}</td>
+                                        <td><?php echo e($personalis_bsm_2_sheet->id); ?></td>
+                                        <td><?php echo e($personalis_bsm_2_sheet->name); ?></td>
                                         <td>
                                             <div class="dropdown open">
                                                 <a class="btn r-button"
-                                                    href="{{ route('personalis_bsm_2.delete', $personalis_bsm_2_sheet->id) }}">Delete</a>
+                                                    href="<?php echo e(route('personalis_bsm_2.delete', $personalis_bsm_2_sheet->id)); ?>">Delete</a>
                                             </div>
                                         </td>
                                     </tr>
-                                @endforeach
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                             </tbody>
                         </table>
                     </div>
@@ -79,9 +81,9 @@
             </div>
         </div>
     </div>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@push('scripts')
+<?php $__env->startPush('scripts'); ?>
     <script>
         $(document).ready(function () {
             const button = $('#import-button');
@@ -110,10 +112,10 @@
 
                 // Start the import
                 $.ajax({
-                    url: '{{ route("personalis_bsm_2.import") }}',
+                    url: '<?php echo e(route("personalis_bsm_2.import")); ?>',
                     method: 'POST',
                     data: {
-                        _token: '{{ csrf_token() }}'
+                        _token: '<?php echo e(csrf_token()); ?>'
                     },
                     success: function (response) {
                         statusDiv.html('<div class="alert alert-success">' + response.message + '</div>');
@@ -134,9 +136,9 @@
 
                 // Call repeatedly every few seconds
                 checkInterval = setInterval(function () {
-                    // $.get('{{ route("process.queue") }}'); // this triggers 1 job per call
+                    // $.get('<?php echo e(route("process.queue")); ?>'); // this triggers 1 job per call
 
-                    $.get('{{ route("queue.status") }}', function (response) {
+                    $.get('<?php echo e(route("queue.status")); ?>', function (response) {
                         const processed = response.processed || 0;
                         const remaining = response.size || 0;
                         const total = response.total || totalJobs;
@@ -169,7 +171,7 @@
                 clearInterval(checkInterval);
 
                 checkInterval = setInterval(function () {
-                    $.get('{{ route("queue.status") }}', function (response) {
+                    $.get('<?php echo e(route("queue.status")); ?>', function (response) {
                         const processed = response.processed || 0;
                         const remaining = response.size || 0;
                         const total = response.total || totalJobs;
@@ -212,4 +214,5 @@
             }
         });
     </script>
-@endpush
+<?php $__env->stopPush(); ?>
+<?php echo $__env->make('layout.master', \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?><?php /**PATH D:\Downloads\laragon\www\tissue-dashboard\resources\views/personalis_bsm2/index.blade.php ENDPATH**/ ?>

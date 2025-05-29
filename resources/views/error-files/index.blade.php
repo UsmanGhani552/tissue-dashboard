@@ -10,7 +10,7 @@
                         <h2>Error Files ({{ $count }})</h2>
                     </div>
                     <div class="col-lg-6">
-                        <button type="button" href="{{ route('retry') }}" class="btn btn-danger retry-btn">Retry
+                        <button type="button" href="{{ route('retry') }}" class="btn r-button retry-btn">Retry
                             <span id="button-spinner"
                                 class="spinner-border spinner-border-sm d-none"></span></button>
                     </div>

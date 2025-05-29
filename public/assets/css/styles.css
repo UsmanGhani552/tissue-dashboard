@@ -808,6 +808,13 @@
     font-weight: 600 !important;
 }
 .g-button{border-color: #c9e4ff !important; color: #000 !important; border-radius: 25px !important; padding: 7px 25px !important; background: #dbece6 !important;}
+.r-button {
+    border-color: #ffa0a0 !important;
+    color: #fffdfd !important;
+    border-radius: 25px !important;
+    padding: 7px 25px !important;
+    background: #eb7076 !important;
+}
 .forms{justify-content: end;}
 .forms input{border-radius: 3px 0px 0px 3px;}
 .forms button{background: #dbece6 !important; color: #000; border-radius: 0px 3px 3px 0px !important; border: none !important;}

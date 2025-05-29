@@ -17,6 +17,7 @@ class FindMatchController extends Controller
             $sheetDataB = Manifest::latest()->first();
 
             $recordsA = $sheetDataA ? json_decode($sheetDataA->data, true) : [];
+            // dd($recordsA);
             $recordsB = $sheetDataB ? json_decode($sheetDataB->data, true) : [];
 
             // Extract submitter_ids
@@ -25,7 +26,6 @@ class FindMatchController extends Controller
 
             $submitterIdsA = array_column($recordsA, 'submitter_id');
             $submitterIdsB = array_column($recordsB, 'submitter_id');
-            // dd($submitterIdsB);
 
             // Find matches
             $matchedIds = array_intersect($submitterIdsA, $submitterIdsB);

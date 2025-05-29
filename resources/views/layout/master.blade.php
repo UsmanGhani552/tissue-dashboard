@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>C4hcs</title>
+    <title>Tissue</title>
+    <link rel="shortcut icon" href="{{ asset('assets/images/short-icon.png') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/styles.css') }}">
     <link rel='stylesheet' href='https://cdn.datatables.net/1.13.5/css/dataTables.bootstrap5.min.css'>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
@@ -187,7 +188,7 @@
                                 <!-- <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
                         <span class="navbar-toggler-icon"></span>
                         </button> -->
-                                <div class="headerRow" id="">
+                                <div class="headerRow d-flex align-items-center">
                                     <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                                         <button class="btn btn-primary triggerBtn2" type="button">
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
@@ -197,7 +198,7 @@
                                         </button>
                                         <h2>Dashboard</h2>
                                     </ul>
-                                    <a href="{{ route('error-files') }}" class="btn btn-danger">Error Files</a>
+                                    <a href="{{ route('error-files') }}" class="btn r-button">Error Files</a>
                                     {{-- <form class="d-flex" role="search">
                                         <div class="searchBtn">
                                             <input class="form-control me-2" type="search" placeholder="Search"
