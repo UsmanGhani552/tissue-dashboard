@@ -1,5 +1,5 @@
-@extends('layout.master')
-@section('content')
+
+<?php $__env->startSection('content'); ?>
 <div class="tab-content">
 
 
@@ -10,26 +10,26 @@
                     <h2>Total Records</h2>
                 </div>
                 <div class="col-lg-10 margin-top" style="margin-top:-20px">
-                    <form method="GET" action="{{ route('personalis_bsm_2.show') }}">
+                    <form method="GET" action="<?php echo e(route('personalis_bsm_2.show')); ?>">
                         <div class="row align-items-end">
                             <div class="col">
                                 <label for="">Date</label>
-                                <input type="date" name="date" class="form-control" placeholder="Search By Date" value="{{ request('date') }}">
+                                <input type="date" name="date" class="form-control" placeholder="Search By Date" value="<?php echo e(request('date')); ?>">
                             </div>
                             <div class="col">
                                 <label for="">From</label>
-                                <input type="date" name="from_date" class="form-control" placeholder="Search By Date" value="{{ request('from_date') }}">
+                                <input type="date" name="from_date" class="form-control" placeholder="Search By Date" value="<?php echo e(request('from_date')); ?>">
                             </div>
                             <div class="col">
                                 <label for="">To</label>
-                                <input type="date" name="to_date" class="form-control" placeholder="Search By Date" value="{{ request('to_date') }}">
+                                <input type="date" name="to_date" class="form-control" placeholder="Search By Date" value="<?php echo e(request('to_date')); ?>">
                             </div>
                             <div class="col">
                                 <button type="submit" class="btn btn-primary w-100">Search</button>
                             </div>
                             <div class="col">
                                 <div>
-                                    <a href="{{ route('personalis_bsm_2') }}" class="btn btn-primary  w-100">Back</a>
+                                    <a href="<?php echo e(route('personalis_bsm_2')); ?>" class="btn btn-primary  w-100">Back</a>
                                 </div>
                             </div>
                         </div>
@@ -45,18 +45,18 @@
                                     <th>Submitter Id</th>
                                     <th>Tracking</th>
                                     <th>Ship date</th>
-                                    {{-- <th>Actions</th> --}}
+                                    
                                 </tr>
                             </thead>
                             <tbody class="overflow-auto">
-                                @foreach ($personalisBsm2s as $personalisBsm2)
+                                <?php $__currentLoopData = $personalisBsm2s; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $personalisBsm2): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                 <tr>
-                                    <td>{{ $personalisBsm2->submitter_id }}</td>
-                                    <td>{{ $personalisBsm2->tracking_id }}</td>
-                                    {{-- <td>{{ $personalisBsm2->count }}</td> --}}
-                                    <td>{{ $personalisBsm2->ship_date }}</td>
+                                    <td><?php echo e($personalisBsm2->submitter_id); ?></td>
+                                    <td><?php echo e($personalisBsm2->tracking_id); ?></td>
+                                    
+                                    <td><?php echo e($personalisBsm2->ship_date); ?></td>
                                 </tr>
-                                @endforeach
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                             </tbody>
                         </table>
                         <table class="table">
@@ -69,12 +69,13 @@
                                 <tr>
                                     <td>
                                         <div class="progress">
-                                            <div class="progress-bar progress-bar-striped bg-success progress-bar-animated" role="progressbar" style="width: {{ $shippedPercentage }}%;" aria-valuenow="250" aria-valuemin="200" aria-valuemax="100">{{  number_format($shippedPercentage,0) }}%</div>
+                                            <div class="progress-bar progress-bar-striped bg-success progress-bar-animated" role="progressbar" style="width: <?php echo e($shippedPercentage); ?>%;" aria-valuenow="250" aria-valuemin="200" aria-valuemax="100"><?php echo e(number_format($shippedPercentage,0)); ?>%</div>
                                         </div>
                                     </td>
                                 </tr>
                             </tbody>
-                            {{ $personalisBsm2s->links() }}
+                            <?php echo e($personalisBsm2s->links()); ?>
+
                         </table>
                     </div>
                 </div>
@@ -84,4 +85,6 @@
         </div>
 
     </div>
-    @endsection
+    <?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layout.master', \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?><?php /**PATH D:\Downloads\laragon\www\tissue-dashboard\resources\views/personalis_bsm2/show.blade.php ENDPATH**/ ?>
