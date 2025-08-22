@@ -32,7 +32,7 @@
 
                                 <div class="col-md-2 d-grid">
                                     <label class="form-label invisible">Export</label>
-                                    <a href="<?php echo e(route('personalis_bsm_2.export')); ?>" class="btn btn-success">Export</a>
+                                   <a href="<?php echo e(route('personalis_bsm_2.export', request()->all())); ?>" class="btn btn-success">Export</a>
                                 </div>
 
                                 <div class="col-md-2 d-grid">

@@ -153,9 +153,10 @@ class PersonalisBsm2Controller extends Controller
         Artisan::call('queue:retry', ['id' => 'all']);
         return response()->json(['message' => 'All failed jobs have been retried']);
     }
-    public function export()
+    public function export(Request $request)
     {
-        return Excel::download(new PersonalisBsm2Export(), 'productivity_data.xlsx');
+        $filters = request()->all();
+        return Excel::download(new PersonalisBsm2Export($filters), 'productivity_data.xlsx');
     }
 
     public function show(Request $request)

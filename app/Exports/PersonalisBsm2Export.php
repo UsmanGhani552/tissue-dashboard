@@ -9,12 +9,35 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class PersonalisBsm2Export implements FromCollection, WithHeadings, WithMapping
 {
+    protected $filters;
+
+    public function __construct($filters)
+    {
+        $this->filters = $filters;
+    }
+
     /**
-    * @return \Illuminate\Support\Collection
-    */
+     * @return \Illuminate\Support\Collection
+     */
     public function collection()
     {
-        return PersonalisBsm2::select('submitter_id','tracking_id','ship_date')->get();
+        $name = $this->filters['name'] ?? null;
+        $date = $this->filters['date'] ?? null;
+        $from_date = $this->filters['from_date'] ?? null;
+        $to_date = $this->filters['to_date'] ?? null;
+
+        return PersonalisBsm2::query()
+            ->select('submitter_id', 'tracking_id', 'ship_date')
+            ->when($name, function ($query, $name) {
+                return $query->where('name', 'like', "%{$name}%");
+            })
+            ->when($date, function ($query, $date) {
+                return $query->where('ship_date', $date);
+            })
+            ->when($from_date && $to_date, function ($query) use ($from_date, $to_date) {
+                return $query->whereBetween('ship_date', [$from_date, $to_date]);
+            })
+            ->get();
     }
 
     public function headings(): array
