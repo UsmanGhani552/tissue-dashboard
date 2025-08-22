@@ -3,19 +3,18 @@
     <div class="tab-content">
         <div class="tab-pane active" id="currentweek" role="tabpanel" aria-labelledby="currentweek-tab">
             <div class="container-fluid current-head">
-                <div class="row">
-                    <div class="col-md-6 p-0">
-                        <h2>Total Records</h2>
+                <div class="row align-items-center mb-3">
+                    <div class="col-lg-4">
+                        <h2 class="mb-0">Total Records</h2>
                     </div>
 
-                    <div class="col-md-6 text-end">
-                        <a id="import-button" class="import-btn btn g-button forms">
+                    <div class="col-lg-8 text-end">
+                        <a id="import-button" class="import-btn btn g-button forms me-2">
                             <span id="button-text">Import</span>
                             <span id="button-spinner" class="spinner-border spinner-border-sm d-none"></span>
                         </a>
-                        <a href="{{ route('personalis_bsm_2.show') }}" class="btn g-button">Show</a>
-                        <a href="{{ route('personalis_bsm_2.export') }}" class="btn g-button">Export</a>
-                        <a href="{{ route('personalis_bsm_2.delete-all') }}" class="btn r-button">Delete All</a>
+                        <a href="{{ route('personalis_bsm_2.show') }}" class="btn g-button me-2">Show</a>
+                        <a href="{{ route('personalis_bsm_2.delete-all') }}" class="btn btn-danger">Delete All</a>
                     </div>
                 </div>
             </div>

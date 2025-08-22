@@ -176,7 +176,8 @@ class PersonalisBsm2Controller extends Controller
             ->when($from_date && $to_date, function ($query) use ($from_date, $to_date) {
                 return $query->whereBetween('ship_date', [$from_date, $to_date]);
             })
-            ->paginate(10);
+            ->paginate(10)
+            ->appends($request->all());
 
         // Total count of filtered items
         $totalCount = $personalisBsm2s->count();

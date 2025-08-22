@@ -66,3 +66,7 @@
 [2025-05-29 18:17:53] local.INFO: base url is:http://tissue-dashboard.test  
 [2025-05-29 18:17:53] local.INFO: 6  
 [2025-05-29 18:17:53] local.INFO: API called asynchronously: http://tissue-dashboard.test/api/start-queue  
+[2025-05-30 16:58:53] local.ERROR: Out of memory (allocated 20971520 bytes) (tried to allocate 32768 bytes) {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Out of memory (allocated 20971520 bytes) (tried to allocate 32768 bytes) at D:\\Downloads\\laragon\\www\\tissue-dashboard\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php:1)
+[stacktrace]
+#0 {main}
+"} 
